@@ -1,0 +1,22 @@
+@startuml WordHunt_Context
+!include <C4/C4_Context>
+!include <tupadr3/font-awesome/book>
+
+title Word Hunt — C4 Context
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam wrapWidth 220
+skinparam wrapMessageWidth 180
+
+Person(guest, "Гость", "Регистрируется или входит в аккаунт.")
+Person(student, "Пользователь", "Изучает английские слова по своим фотографиям.")
+Person(admin, "Администратор", "Обслуживает сервер и модель. Мобильного интерфейса администратора нет.")
+
+System(wordhunt, "Word Hunt", "Распознаёт предметы, создаёт личные карточки слов, проводит тренировки и показывает прогресс.", $sprite="book")
+
+Rel(guest, wordhunt, "Регистрируется, входит", "Мобильное приложение")
+Rel(student, wordhunt, "Добавляет фото и слова, повторяет, смотрит результаты", "Мобильное приложение")
+Rel(admin, wordhunt, "Смотрит технические журналы и обезличенные показатели, управляет моделью", "Серверные инструменты")
+
+SHOW_LEGEND()
+@enduml
