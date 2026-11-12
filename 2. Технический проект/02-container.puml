@@ -24,14 +24,21 @@ System_Boundary(wordhunt, "Word Hunt") {
     Container(ai, "Распознавание изображений", "Ollama / Qwen3-VL-2B-Instruct", "Запуск модели на собственном компьютере или сервере. Английское слово и пример с русским переводом.", $sprite="cogs")
 }
 
+System_Ext(emailsvc, "Email Service", "Внешний сервис отправки писем с кодом подтверждения входа (SMTP / провайдер рассылок).")
+System_Ext(pushsvc, "Push Notification Service", "Внешний сервис доставки пуш-уведомлений на мобильные устройства (например, FCM/APNs).")
+
 Rel(guest, mobile, "Регистрируется, входит", "Интерфейс Android")
 Rel(student, mobile, "Пользуется приложением", "Интерфейс Android")
 Rel(mobile, backend, "Данные и фото JPEG/PNG до 5 МБ; получение карточек и снимков", "HTTPS / REST: JSON, multipart/form-data; JPEG в ответе")
 Rel(backend, db, "Читает и сохраняет данные владельца", "SQL / протокол PostgreSQL")
 Rel(backend, photos, "Сохраняет, читает и удаляет снимки", "Файловые операции / JPEG")
 Rel(backend, ai, "Передаёт фото; получает слово и пример с переводом", "Локальный HTTP API / JSON, изображение в Base64")
+Rel(backend, emailsvc, "Отправляет письмо с кодом подтверждения входа", "HTTPS / SMTP")
+Rel(backend, pushsvc, "Отправляет пуш-уведомления (напоминания, результаты)", "HTTPS")
 Rel(admin, backend, "Смотрит журналы и обезличенные показатели", "Консоль сервера")
 Rel(admin, ai, "Запускает и обновляет модель", "Консоль Ollama")
+Rel(emailsvc, guest, "Доставляет код подтверждения на email")
+Rel(pushsvc, student, "Доставляет пуш-уведомления")
 
 note bottom of ai
   Проектный вариант по ADR-011.
