@@ -1,0 +1,70 @@
+@startuml WordHunt_Container
+!include <C4/C4_Container>
+!include <tupadr3/font-awesome/cogs>
+!include <tupadr3/devicons/android>
+!include <tupadr3/font-awesome/bell>
+!include <tupadr3/font-awesome/folder>
+!include <tupadr3/font-awesome/cogs>
+!include <tupadr3/font-awesome/envelope>
+!include <tupadr3/devicons/nginx>
+!include <tupadr3/devicons2/postgresql>
+!include <tupadr3/devicons/python>
+!include <tupadr3/devicons/redis>
+
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam nodesep 50
+skinparam ranksep 65
+skinparam wrapWidth 200
+skinparam wrapMessageWidth 150
+UpdateElementStyle("component", $bgColor="#85BBF0", $fontColor="#000000", $borderColor="#85BBF0")
+title Диаграмма контейнеров — Word Hunt
+
+Person(guest, "Guest", "Регистрируется\nи входит в приложение")
+Person(user, "User", "Создаёт карточки,\nтренируется, смотрит прогресс")
+Person(admin, "Admin", "Логи, метрики\nи обслуживание модели")
+System_Ext(email, "Email Service", "Отправка писем\nс кодом входа", $sprite="envelope")
+System_Ext(push, "Push Service", "Напоминания\nо повторении слов", $sprite="bell")
+System_Boundary(wordhunt, "Word Hunt System") {
+    Container(mobile, "Mobile Client", "Android 8.0+ / API 26", "Камера, словарь, тренировки,\nпрофиль и прогресс", $sprite="android")
+    Container(nginx, "API Gateway", "Nginx", "Принимает HTTPS-запросы;\nпередаёт их backend", $sprite="nginx")
+    Container(backend, "Core Domain (Monolith)", "Python / FastAPI", "Модульный монолит:\nidentity, vocabulary, photos,\nrecognition, training, progress,\nnotifications", $sprite="python")
+    Container(ai, "ImageRecognition Service", "Ollama / Qwen3-VL-2B-Instruct", "Слово, перевод и пример.\nСобственное оборудование", $sprite="cogs")
+    ContainerDb(db, "Relational Database", "PostgreSQL", "Профили, карточки, коллекции,\nответы и метаданные фото", $sprite="postgresql")
+    ContainerDb(redis, "Session Store", "Redis", "Хеш случайного токена,\nuser_id и TTL", $sprite="redis")
+    ContainerDb(photos, "Blob Storage", "Закрытый каталог / JPEG", "Временные и постоянные фото.\nДоступ через backend", $sprite="folder")
+    Container(backup, "Backup Job", "cron / pg_dump", "Согласованная копия БД\nи постоянных фотографий", $sprite="cogs")
+    ContainerDb(vault, "Backup Vault", "Изолированный носитель", "Зашифрованные\nрезервные копии", $sprite="folder")
+}
+Rel(guest, mobile, "Регистрация и вход", "Интерфейс Android")
+Rel(user, mobile, "Карточки и тренировки", "Интерфейс Android")
+Rel(mobile, nginx, "Данные, фото, токен", "HTTPS / REST")
+Rel(nginx, backend, "Проксирует запросы", "HTTP / REST, закрытый контур")
+Rel(admin, backend, "Логи и метрики", "SSH / серверные инструменты")
+Rel(admin, ai, "Обслуживает модель", "SSH / CLI Ollama")
+Rel(backend, email, "Код входа", "SMTP + TLS")
+Rel(backend, push, "Напоминания", "HTTPS / API")
+Rel(backend, ai, "Фото и результат", "HTTP / JSON + Base64")
+Rel(backend, db, "Данные владельца", "SQL / PostgreSQL")
+Rel(backend, redis, "Проверка и отзыв сессий", "RESP / TCP")
+Rel(backend, photos, "Чтение / запись фото", "Файловый API")
+Rel(db, backup, "Снимок базы данных", "pg_dump")
+Rel(backup, photos, "Копирует постоянные фото", "Файловый API")
+Rel(backup, vault, "Записывает архив", "Файловый API")
+Lay_R(admin, guest)
+Lay_R(guest, user)
+Lay_R(backend, email)
+Lay_R(ai, db)
+Lay_R(db, redis)
+Lay_R(redis, photos)
+Lay_R(photos, push)
+Lay_R(backup, vault)
+Lay_D(guest, mobile)
+Lay_D(mobile, nginx)
+Lay_D(nginx, backend)
+Lay_D(backend, db)
+Lay_D(db, backup)
+
+Lay_R(push, email)
+@enduml
