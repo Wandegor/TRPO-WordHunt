@@ -1,0 +1,172 @@
+@startuml WordHunt_Main_Business_Process_Sequence
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 220
+
+title Основной бизнес-процесс Word Hunt: Распознавание объекта по фото и создание карточки слова
+
+actor "User\n(Пользователь)" as user
+participant "Mobile Client" as mobile #85BBF0
+participant "Reverse proxy\n(Nginx)" as nginx #438DD5
+participant "Backend API\n(Python / FastAPI)" as backend #438DD5
+database "Session Store\n(Redis)" as redis #D9534F
+database "Blob Storage\n(Закрытый каталог)" as storage #F0AD4E
+participant "ImageRecognition\n(Ollama / Qwen3-VL)" as ai #5CB85C
+database "Database\n(PostgreSQL)" as db #337AB7
+
+== Этап 1. Фотографирование и распознавание объекта (ADR-006, ADR-007, ADR-009) ==
+
+user -> mobile : Делает фото предмета (например, кружки с чаем)\nили выбирает из галереи
+activate mobile
+
+mobile -> nginx : POST /api/v1/recognitions\n(Multipart: photo, Header: Session-Token)
+activate nginx
+nginx -> backend : Проксирует HTTP-запрос
+activate backend
+
+backend -> redis : Проверка хеша токена сессии
+activate redis
+redis --> backend : Действующая сессия (user_id)
+deactivate redis
+
+backend -> storage : Сохраняет фото как временное (Файловый API)
+activate storage
+storage --> backend : temp_photo_id
+deactivate storage
+
+backend -> db : INSERT метаданных фото\n(temp_photo_id, user_id, status='TEMP', expires_at)
+activate db
+db --> backend : OK
+deactivate db
+
+backend -> ai : POST запрос на анализ изображения\n(HTTP / JSON + Base64)
+activate ai
+
+alt Объект успешно распознан нейросетью
+    ai --> backend : 200 OK (recognized=true,\nru_word="чай", en_word="tea",\nexample="I drink hot tea.")
+    backend --> nginx : 200 OK (temp_photo_id, recognized=true,\nru_word="чай", en_word="tea", example)
+    nginx --> mobile : 200 OK (JSON)
+    mobile --> user : Показывает фото и предложенные данные:\n«чай» -> «tea» + пример (доступно редактирование)
+
+else Объект не определен нейросетью (НФТ-12, ADR-009)
+    ai --> backend : 200 OK (recognized=false)
+    backend --> nginx : 200 OK (temp_photo_id, recognized=false)
+    nginx --> mobile : 200 OK (JSON)
+    mobile --> user : Сообщает, что объект не распознан.\nПредлагает: 1) Переснять фото 2) Ввести слово вручную
+    
+    alt Пользователь выбирает «Переснять фото»
+        user -> mobile : Нажимает «Переснять фото»
+        mobile --> user : Возврат на экран камеры (начало Этапа 1)
+        note over backend, storage
+          Старый temp_photo_id остается невостребованным.
+          Фоновый процесс PhotoCleanupJob позднее удалит
+          временный файл изображения из Blob Storage и запись из Database.
+        end note
+    else Пользователь выбирает «Ввести слово вручную»
+        user -> mobile : Вводит русское слово вручную
+        note right of user : Переход к Этапу 2
+    end
+
+else Сервис распознавания недоступен (ADR-009)
+    ai --> backend : Timeout / Error
+    deactivate ai
+    backend --> nginx : 503 Service Unavailable\n{"code": "AI_UNAVAILABLE", "message": "..."}
+    deactivate backend
+    nginx --> mobile : 503 Service Unavailable
+    deactivate nginx
+    mobile --> user : Уведомление об ошибке;\nпредложение повторить позже
+end
+
+== Этап 2. Корректировка распознанного слова (если изменено вручную) ==
+
+opt Пользователь изменил предложенное слово («чай» -> «кружка»)
+    user -> mobile : Меняет русское слово «чай» на «кружка»\nи запрашивает обновление перевода
+    mobile -> nginx : POST /api/v1/recognitions/suggest-text\n(JSON: ru_word="кружка", Header: Session-Token)
+    activate nginx
+    nginx -> backend : Проксирует HTTP-запрос
+    activate backend
+    
+    backend -> redis : Проверка хеша токена сессии
+    activate redis
+    redis --> backend : user_id
+    deactivate redis
+    
+    backend -> ai : Запрос перевода и примера для слова «кружка»\n(промпт в Qwen3-VL без распознования)
+    activate ai
+    ai --> backend : 200 OK (ru_word="кружка", en_word="mug",\nexample="He drank coffee from a big mug.")
+    deactivate ai
+    
+    backend --> nginx : 200 OK (ru_word="кружка", en_word="mug", example)
+    deactivate backend
+    nginx --> mobile : 200 OK (JSON)
+    deactivate nginx
+    
+    mobile --> user : Обновляет поля карточки:\n«кружка» -> «mug» и новый пример использования
+end
+
+== Этап 3. Подтверждение и сохранение карточки в словарь (ADR-006) ==
+
+alt Пользователь подтверждает создание карточки
+    user -> mobile : Нажимает «Создать карточку»
+    
+    mobile -> nginx : POST /api/v1/cards\n(JSON: temp_photo_id, word="mug", translation="кружка", example)
+    activate nginx
+    nginx -> backend : Проксирует HTTP-запрос
+    activate backend
+
+    backend -> redis : Проверка хеша токена сессии
+    activate redis
+    redis --> backend : user_id
+    deactivate redis
+
+    backend -> db : Проверка временного фото\n(SELECT по temp_photo_id и user_id)
+    activate db
+    db --> backend : Запись найдена, владелец совпадает, статус='TEMP'(фото ещё временно)
+    deactivate db
+
+    backend -> storage : Перевод фото в постоянное хранилище\n(закрепление файла)
+    activate storage
+    storage --> backend : permanent_photo_key
+    deactivate storage
+
+    backend -> db : Транзакция добавления карточки и обновления статуса фото \nBEGIN TRANSACTION\n1. INSERT INTO cards (user_id, word, translation, example, photo_key)\n2. UPDATE photos SET status='PERMANENT' WHERE id=temp_photo_id\nCOMMIT
+    activate db
+    
+    alt Транзакция БД успешна
+        db --> backend : card_id
+        backend --> nginx : 201 Created (card_id, word="mug", photo_url, ...)
+        nginx --> mobile : 201 Created
+        mobile --> user : Отображает созданную карточку\nв личном словаре
+    else Ошибка сохранения в БД (ADR-006 и ADR-009)
+        db --> backend : SQL Error (ROLLBACK)
+        deactivate db
+        
+        group Учтонить
+                    backend -> storage : Удаление лишнего фото ставшего постоянным (компенсация-файловое хранилище уже переместив фото из папки temp в permanent, ROLLBACK сделать не сможет )
+                    activate storage
+                    storage --> backend : OK
+                    deactivate storage
+                end
+                
+        backend --> nginx : 500 Internal Server Error\n{"code": "CARD_SAVE_FAILED", "message": "Не удалось сохранить карточку"}
+        deactivate backend
+        nginx --> mobile : 500 Internal Server Error
+        deactivate nginx
+        mobile --> user : Сообщение «Не удалось сохранить карточку.\nПопробуйте ещё раз»
+    end
+
+else Пользователь нажимает «Назад» / отменяет создание (ADR-006)
+    user -> mobile : Нажимает «Назад» (отказ от сохранения)
+    mobile --> user : Возврат на главный экран\n(карточка в словаре не создается)
+    deactivate mobile
+    note over backend, storage
+                Фоновый процесс PhotoCleanupJob позднее удалит
+                временный файл изображения из Blob Storage и запись из Database.
+    end note
+end
+
+@enduml
