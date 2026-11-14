@@ -28,10 +28,10 @@ System_Ext(email, "Email Service", "Отправка писем\nс кодом �
 System_Ext(push, "Push Service", "Напоминания\nо повторении слов", $sprite="bell")
 System_Boundary(wordhunt, "Word Hunt System") {
     Container(mobile, "Mobile Client", "Android 8.0+ / API 26", "Камера, словарь, тренировки,\nпрофиль и прогресс", $sprite="android")
-    Container(nginx, "API Gateway", "Nginx", "Принимает HTTPS-запросы;\nпередаёт их backend", $sprite="nginx")
-    Container(backend, "Core Domain (Monolith)", "Python / FastAPI", "Модульный монолит:\nidentity, vocabulary, photos,\nrecognition, training, progress,\nnotifications", $sprite="python")
+    Container(nginx, "Reverse proxy", "Nginx", "Принимает единыйHTTPS-запросы;\nпередаёт их backend", $sprite="nginx")
+    Container(backend, "Backend API", "Python / FastAPI", "Модульный монолит:\nidentity, vocabulary, photos,\nrecognition, training, progress,\nnotifications", $sprite="python")
     Container(ai, "ImageRecognition Service", "Ollama / Qwen3-VL-2B-Instruct", "Слово, перевод и пример.\nСобственное оборудование", $sprite="cogs")
-    ContainerDb(db, "Relational Database", "PostgreSQL", "Профили, карточки, коллекции,\nответы и метаданные фото", $sprite="postgresql")
+    ContainerDb(db, "Database", "PostgreSQL", "Профили, карточки, коллекции,\nответы и метаданные фото", $sprite="postgresql")
     ContainerDb(redis, "Session Store", "Redis", "Хеш случайного токена,\nuser_id и TTL", $sprite="redis")
     ContainerDb(photos, "Blob Storage", "Закрытый каталог / JPEG", "Временные и постоянные фото.\nДоступ через backend", $sprite="folder")
     Container(backup, "Backup Job", "cron / pg_dump", "Согласованная копия БД\nи постоянных фотографий", $sprite="cogs")

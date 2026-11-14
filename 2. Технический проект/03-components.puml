@@ -1,43 +1,66 @@
 @startuml WordHunt_Component
 !include <C4/C4_Component>
-!include <tupadr3/font-awesome/folder>
+!include <tupadr3/devicons/python>
 !include <tupadr3/devicons/nginx>
 !include <tupadr3/devicons2/postgresql>
-!include <tupadr3/devicons/python>
 !include <tupadr3/devicons/redis>
+!include <tupadr3/font-awesome/folder>
 
 LAYOUT_TOP_DOWN()
+!pragma horizontalLineBetweenDifferentPackageAllowed
+
+skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam shadowing false
-skinparam nodesep 35
-skinparam ranksep 55
-skinparam wrapWidth 200
-skinparam wrapMessageWidth 150
-UpdateElementStyle("component", $bgColor="#85BBF0", $fontColor="#000000", $borderColor="#85BBF0")
+skinparam roundcorner 0
+skinparam nodesep 55
+skinparam ranksep 65
+skinparam wrapWidth 220
+skinparam wrapMessageWidth 180
+skinparam ArrowColor #777777
+skinparam ArrowFontColor #666666
+skinparam ArrowFontSize 12
+skinparam titleFontSize 22
+
+UpdateElementStyle("container", $bgColor="#438DD5", $fontColor="#FFFFFF", $borderColor="#438DD5")
+UpdateElementStyle("component", $bgColor="#85BBF0", $fontColor="#071625", $borderColor="#85BBF0")
+UpdateBoundaryStyle("", $fontColor="#555555", $borderColor="#888888", $borderStyle=DashedLine())
+UpdateContainerBoundaryStyle($fontColor="#555555", $borderColor="#888888", $type="container: Python / FastAPI")
+
+skinparam rectangle<<layoutSpacer>> {
+    BackgroundColor transparent
+    BorderColor transparent
+    FontColor transparent
+    Shadowing false
+}
+hide stereotype
+
 title Диаграмма компонентов — Word Hunt Backend API
 
-Container(nginx, "Обратный прокси", "Nginx", "Маршрутизация\nвнешних запросов", $sprite="nginx")
-ContainerDb(db, "База данных", "PostgreSQL", "Карточки, коллекции,\nметаданные фотографий", $sprite="postgresql")
-ContainerDb(photos, "Хранилище фото", "Закрытый каталог / JPEG", "Временные и постоянные\nфотографии пользователя", $sprite="folder")
-ContainerDb(redis, "Хранилище сессий", "Redis", "Серверные сессии\nсо случайными токенами", $sprite="redis")
+Container(nginx, "Reverse proxy", "Nginx", "Маршрутизация\nвнешних запросов", $sprite="nginx")
 
 Container_Boundary(backend, "Backend API") {
+
     Boundary(api, "API") {
         Component(router, "VocabularyRouter", "Python / FastAPI APIRouter", "Принимает HTTP-запросы\nкарточек и коллекций", $sprite="python")
         Component(auth, "SessionAuthDependency", "Python / FastAPI Depends", "Проверяет случайный токен\nи определяет user_id", $sprite="python")
     }
+
     Boundary(application, "Application") {
+        rectangle " " as app_anchor <<layoutSpacer>>
         Component(service, "VocabularyService", "Python", "Карточки, коллекции, поиск.\nПроверяет владение,\nподтверждение и повторы", $sprite="python")
         Component(photo_service, "PhotoService", "Python / modules.photos", "Владелец и temp_photo_id;\nзакрепление и удаление фото", $sprite="python")
         Component(photo_port, "IPhotoStorage", "Python / Protocol", "Контракт файлов\nи метаданных фото", $sprite="python")
         Component(session_port, "ISessionStore", "Python / Protocol", "Контракт проверки\nсерверной сессии", $sprite="python")
     }
+
     Boundary(domain, "Domain") {
         Component(card, "WordCard", "Python", "Карточка: фото, слово,\nперевод и пример", $sprite="python")
         Component(rules, "CardRules", "Python", "Правила создания\nи изменения карточки", $sprite="python")
         Component(repo_port, "IVocabularyRepository", "Python / Protocol", "Контракт хранения\nкарточек и коллекций", $sprite="python")
         Component(collection, "WordCollection", "Python", "Тематическая коллекция\nкарточек пользователя", $sprite="python")
     }
+
     Boundary(infrastructure, "Infrastructure") {
         Component(repository, "PostgresVocabularyRepository", "Python / PostgreSQL", "Карточки и коллекции.\nТранзакции и фильтр user_id", $sprite="python")
         Component(storage, "FilePhotoStorage", "Python / SQL + File API", "Читает и сохраняет файлы\nи метаданные фотографий", $sprite="python")
@@ -46,60 +69,63 @@ Container_Boundary(backend, "Backend API") {
     }
 }
 
-Rel(nginx, router, "HTTP-запросы", "REST API")
-Rel(router, auth, "Проверяет\nсессию")
-Rel(router, service, "Вызывает сценарии")
-Rel(auth, session_port, "Вызывает контракт\nпроверки сессии")
-Rel(service, card, "Использует")
-Rel(card, rules, "Проверяет")
-Rel(collection, card, "Группирует\nкарточки")
-Rel(service, repo_port, "Вызывает методы\nконтракта")
-Rel(service, photo_service, "Подтверждает фото")
-Rel(photo_service, photo_port, "Вызывает контракт")
-repository ..> repo_port : Реализует
-storage ..> photo_port : Реализует
-session_store ..> session_port : Реализует
-Rel(cleanup, photo_service, "Запускает очистку")
-Rel(repository, db, "Чтение / запись", "SQL / PostgreSQL")
-Rel(storage, db, "Метаданные фото", "SQL / PostgreSQL")
-Rel(storage, photos, "Чтение / запись", "Файловый API")
-Rel(session_store, redis, "Проверяет сессию", "RESP / TCP")
+ContainerDb(db, "Database", "PostgreSQL", "Карточки, коллекции,\nметаданные фотографий", $sprite="postgresql")
+ContainerDb(photos, "Session Store", "Закрытый каталог / JPEG", "Временные и постоянные\nфотографии пользователя", $sprite="folder")
+ContainerDb(redis, "Session Store", "Redis", "Серверные сессии\nсо случайными токенами", $sprite="redis")
 
-' ==========================================
-' === МАКРОСОВКА ГРАНИЦ И КОМПОНЕНТОВ ===
-' ==========================================
-
-' Основная вертикальная и горизонтальная структура
-Lay_D(nginx, api)
-Lay_D(api, application)
-Lay_R(application, domain)
-Lay_D(application, infrastructure)
-Lay_D(domain, infrastructure)
-
-' Нижний ряд (Базы данных)
-Lay_D(infrastructure, db)
-Lay_R(db, photos)
-Lay_R(photos, redis)
-
-' Внутри API
+Lay_D(nginx, router)
 Lay_R(router, auth)
 
-' Внутри Application
-Lay_D(service, photo_service)
-Lay_L(service, photo_service)
+Lay_D(router, app_anchor)
+Lay_D(auth, service)
+Lay_R(app_anchor, service)
+Lay_R(service, card)
+Lay_R(card, rules)
+
+Lay_D(app_anchor, photo_service)
 Lay_D(photo_service, photo_port)
 Lay_D(service, session_port)
-Lay_R(photo_port, session_port)
 
-' Внутри Domain
-Lay_R(card, rules)
+Lay_R(photo_port, session_port)
+Lay_R(session_port, repo_port)
+Lay_R(repo_port, collection)
 Lay_D(card, repo_port)
 Lay_D(rules, collection)
-Lay_R(repo_port, collection)
 
-' Внутри Infrastructure
+Lay_D(photo_port, repository)
+Lay_D(session_port, storage)
+Lay_D(repo_port, cleanup)
+Lay_D(collection, session_store)
 Lay_R(repository, storage)
 Lay_R(storage, cleanup)
 Lay_R(cleanup, session_store)
+
+Lay_D(repository, db)
+Lay_D(storage, photos)
+Lay_D(session_store, redis)
+Lay_R(db, photos)
+Lay_R(photos, redis)
+
+Rel_(nginx, router, "HTTP-запросы", "REST API", "-[norank]->")
+Rel_(router, auth, "Проверяет\nсессию", "-[norank]->")
+Rel_(router, service, "Вызывает сценарии", "-[norank]->")
+Rel_(auth, session_port, "Вызывает контракт\nпроверки сессии", "-[norank]->")
+
+Rel_(service, card, "Использует", "-[norank]->")
+Rel_(card, rules, "Проверяет", "-[norank]->")
+Rel_(collection, card, "Группирует\nкарточки", "-[norank]->")
+Rel_(service, repo_port, "Вызывает методы\nконтракта", "-[norank]->")
+Rel_(service, photo_service, "Подтверждает фото", "-[norank]->")
+Rel_(photo_service, photo_port, "Вызывает контракт", "-[norank]->")
+
+Rel_(repository, repo_port, "Реализует", "-[norank,dashed]->")
+Rel_(storage, photo_port, "Реализует", "-[norank,dashed]->")
+Rel_(session_store, session_port, "Реализует", "-[norank,dashed]->")
+Rel_(cleanup, photo_service, "Запускает очистку", "-[norank]->")
+
+Rel_(repository, db, "Чтение / запись", "SQL / PostgreSQL", "-[norank]->")
+Rel_(storage, db, "Метаданные фото", "SQL / PostgreSQL", "-[norank]->")
+Rel_(storage, photos, "Чтение / запись", "Файловый API", "-[norank]->")
+Rel_(session_store, redis, "Проверяет сессию", "RESP / TCP", "-[norank]->")
 
 @enduml
