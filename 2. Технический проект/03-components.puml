@@ -58,7 +58,7 @@ Container_Boundary(backend, "Backend API — модульный монолит")
 
             Component(vocabulary, "VocabularyService", "Python / vocabulary", "Карточки, коллекции, поиск;\nподтверждение создания", $sprite="python")
 
-            Component(photo_service, "PhotoService", "Python / photos", "JPEG/PNG ≤ 5 МБ; JPEG ≤ 1600 px;\nвременные фото, владелец", $sprite="python")
+            Component(photo_service, "PhotoService", "Python / photos", "получает сведения о файле;\nвызывает доменные проверки;\nподготовку и сохранение фотографии", $sprite="python")
 
             Component(recognition, "RecognitionService", "Python / recognition", "Фото → слово и пример;\nобработка ошибок модели", $sprite="python")
 
@@ -229,4 +229,5 @@ Lay_R(db, photos)
 Lay_R(photos, ai)
 Lay_R(ai, email)
 Lay_R(email, push)
+
 @enduml
