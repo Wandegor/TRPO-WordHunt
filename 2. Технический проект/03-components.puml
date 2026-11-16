@@ -10,29 +10,36 @@
 !include <tupadr3/font-awesome/bell>
 
 LAYOUT_TOP_DOWN()
-!pragma layout smetana
-!pragma horizontalLineBetweenDifferentPackageAllowed
 
+skinparam linetype polyline
 skinparam backgroundColor white
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
 skinparam shadowing false
-skinparam roundcorner 0
-skinparam nodesep 40
-skinparam ranksep 55
-skinparam wrapWidth 190
-skinparam wrapMessageWidth 150
+skinparam roundcorner 4
+skinparam nodesep 65
+skinparam ranksep 110
+skinparam wrapWidth 160
+skinparam wrapMessageWidth 110
 skinparam ArrowColor #788795
-skinparam ArrowFontColor #536575
+skinparam ArrowFontColor #33485D
 skinparam ArrowFontSize 10
 skinparam titleFontSize 22
-skinparam padding 2
+skinparam padding 4
 skinparam LegendFontColor #536575
 
 UpdateElementStyle("container", $bgColor="#438DD5", $fontColor="#FFFFFF", $borderColor="#438DD5")
-UpdateElementStyle("component", $bgColor="#85BBF0", $fontColor="#071625", $borderColor="#85BBF0")
+UpdateElementStyle("component", $bgColor="#85BBF0", $fontColor="#071625", $borderColor="#5A9BD5")
 UpdateElementStyle("external_system", $bgColor="#777777", $fontColor="#FFFFFF", $borderColor="#777777")
-UpdateBoundaryStyle("", $fontColor="#536575", $borderColor="#96A4B1", $borderStyle=DashedLine())
-UpdateContainerBoundaryStyle($fontColor="#33485D", $borderColor="#96A4B1", $type="container: Python / FastAPI")
+
+UpdateBoundaryStyle("", $fontColor="#33485D", $borderColor="#96A4B1", $borderStyle=DashedLine())
+UpdateContainerBoundaryStyle($fontColor="#1D2D3E", $borderColor="#52718E", $type="Container: Python / FastAPI")
+
+AddRelTag("api", $lineColor="#438DD5", $textColor="#2B6CB0")
+AddRelTag("domain", $lineColor="#B7791F", $textColor="#975A16")
+AddRelTag("module", $lineColor="#008D80", $textColor="#00695F")
+AddRelTag("storage", $lineColor="#805AD5", $textColor="#553C9A")
+AddRelTag("job", $lineColor="#DD6B20", $textColor="#C05621")
 
 hide stereotype
 
@@ -42,192 +49,135 @@ Container(nginx, "Reverse Proxy", "Nginx", "HTTPS → FastAPI", $sprite="nginx")
 
 Container_Boundary(backend, "Backend API — модульный монолит") {
 
-    Boundary(api, "API") {
-        Component(auth_dependency, "SessionAuthDependency", "Python / FastAPI Depends", "Проверка сессии; user_id\nдля защищённых маршрутов", $sprite="python")
-
-        Component(api_router, "ApiRouter", "Python / FastAPI APIRouter", "HTTP-маршруты\nсеми модулей", $sprite="python")
-
-        Component(error_handler, "ApiErrorHandler", "Python / FastAPI", "HTTP-статус, code, message;\nподробности в журнале", $sprite="python")
+    Boundary(api, "API — HTTP и проверка запроса") {
+        Component(auth_dependency, "SessionAuthDependency", "Python / FastAPI Depends", "Сессия → user_id", $sprite="python")
+        Component(api_router, "ApiRouter", "Python / FastAPI APIRouter", "HTTP-маршруты семи модулей", $sprite="python")
+        Component(error_handler, "ApiErrorHandler", "Python / FastAPI", "HTTP-статус и безопасные ошибки", $sprite="python")
     }
 
-    together {
-
-        Boundary(application, "Application — прикладные сценарии") {
-
-            Component(identity, "IdentityService", "Python / identity", "Вход, профиль, email-код;\nсоздание и отзыв сессии", $sprite="python")
-
-            Component(vocabulary, "VocabularyService", "Python / vocabulary", "Карточки, коллекции, поиск;\nподтверждение создания", $sprite="python")
-
-            Component(photo_service, "PhotoService", "Python / photos", "получает сведения о файле;\nвызывает доменные проверки;\nподготовку и сохранение фотографии", $sprite="python")
-
-            Component(recognition, "RecognitionService", "Python / recognition", "Фото → слово и пример;\nобработка ошибок модели", $sprite="python")
-
-            Component(training, "TrainingService", "Python / training", "Карточки для повторения;\nзапись каждого ответа", $sprite="python")
-
-            Component(progress, "ProgressService", "Python / progress", "Статистика, серии занятий\nи достижения по истории", $sprite="python")
-
-            Component(notifications, "NotificationService", "Python / notifications", "Настройки и токены устройств;\nнапоминания о повторении", $sprite="python")
-        }
-
-        Boundary(domain, "Domain — модели и правила") {
-
-            Component(identity_domain, "identity.domain", "Python", "User, Profile;\nправила учётной записи", $sprite="python")
-
-            Component(vocabulary_domain, "vocabulary.domain", "Python", "WordCard, WordCollection;\nправила карточек и коллекций", $sprite="python")
-
-            Component(photo_domain, "photos.domain", "Python", "PhotoMetadata, PhotoState;\nвладелец и жизненный цикл", $sprite="python")
-
-            Component(learning_domain, "training.domain\nprogress.domain", "Python / группа пакетов", "ReviewAnswer; правила\nпрогресса и достижений", $sprite="python")
-
-            Component(reminder_policy, "notifications.domain", "Python", "ReminderPolicy;\nусловия и время напоминаний", $sprite="python")
-        }
+    Boundary(jobs, "Background Jobs — фоновые точки входа") {
+        Component(photo_cleanup, "PhotoCleanupJob", "Python / периодическая задача", "Очистка временных фото", $sprite="python")
+        Component(reminder_job, "ReminderJob", "Python / периодическая задача", "Запуск напоминаний", $sprite="python")
     }
 
-    Boundary(infrastructure, "Infrastructure — адаптеры и фоновые задачи") {
 
-        Component(repositories, "PostgresRepositories", "Python / группа репозиториев", "Данные каждого модуля;\nSQL-агрегаты ProgressQueries", $sprite="python")
+    Boundary(application, "Application — сценарии семи модулей") {
+        Component(identity, "IdentityService", "Python / identity", "Профиль, вход, выход", $sprite="python")
+        Component(recognition, "RecognitionService", "Python / recognition", "Фото → слово, перевод, пример", $sprite="python")
+        Component(photo_service, "PhotoService", "Python / photos", "Подготовка и сохранение фото", $sprite="python")
+        Component(vocabulary, "VocabularyService", "Python / vocabulary", "Карточки и коллекции", $sprite="python")
+        Component(training, "TrainingService", "Python / training", "Карточки словаря; запись ответов", $sprite="python")
+        Component(progress, "ProgressService", "Python / progress", "Статистика и достижения", $sprite="python")
+        Component(notifications, "NotificationService", "Python / notifications", "Настройки и напоминания", $sprite="python")
+    }
 
-        Component(session_store, "RedisSessionStore", "Python / ISessionStore", "Хеш токена, user_id, TTL;\nпроверка и отзыв сессий", $sprite="python")
+    Boundary(domain, "Domain — модели и правила") {
+        Component(identity_domain, "identity.domain", "Python", "User, Profile; правила аккаунта", $sprite="python")
+        Component(photo_domain, "photos.domain", "Python", "PhotoMetadata, PhotoState;\nPhotoRules: JPEG/PNG ≤ 5 МБ", $sprite="python")
+        Component(vocabulary_domain, "vocabulary.domain", "Python", "WordCard, WordCollection;\nправила карточек", $sprite="python")
+        Component(learning_domain, "training.domain &\nprogress.domain", "Python / группа пакетов", "ReviewAnswer;\nправила прогресса", $sprite="python")
+        Component(reminder_policy, "notifications.domain", "Python", "ReminderPolicy;\nвремя и условия", $sprite="python")
+    }
 
-        Component(photo_storage, "FilePhotoStorage", "Python / IPhotoStorage", "Чтение, запись и удаление\nзакрытых JPEG-файлов", $sprite="python")
 
-        Component(ollama_client, "OllamaClient", "Python / IImageRecognizer", "Запрос модели, тайм-аут;\nпроверка результата", $sprite="python")
-
-        Component(email_sender, "EmailSender", "Python / IEmailSender", "Письмо с кодом входа", $sprite="python")
-
-        Component(push_sender, "PushSender", "Python / IPushSender", "Доставка напоминаний", $sprite="python")
-
-        Component(photo_cleanup, "PhotoCleanupJob", "Python / периодическая задача", "Запускает очистку\nпросроченных временных фото", $sprite="python")
-
-        Component(reminder_job, "ReminderJob", "Python / периодическая задача", "Запускает проверку\nи отправку напоминаний", $sprite="python")
+    Boundary(infrastructure, "Infrastructure — реализации адаптеров БД и внешних сервисов") {
+        Component(session_store, "RedisSessionStore", "Python / ISessionStore", "Хеш токена, user_id, TTL", $sprite="python")
+        Component(email_sender, "EmailSender", "Python / IEmailSender", "Письмо с кодом", $sprite="python")
+        Component(ollama_client, "OllamaClient", "Python / IImageRecognizer", "HTTP-клиент модели", $sprite="python")
+        Component(photo_storage, "FilePhotoStorage", "Python / IPhotoStorage", "Закрытые JPEG-файлы", $sprite="python")
+        Component(repositories, "PostgresRepositories", "Python / группа репозиториев", "Репозитории модулей;\nProgressQueries", $sprite="python")
+        Component(push_sender, "PushSender", "Python / IPushSender", "Доставка push", $sprite="python")
     }
 }
 
-ContainerDb(db, "Database", "PostgreSQL", "Профили, карточки, коллекции;\nответы, метаданные, настройки", $sprite="postgresql")
-
 ContainerDb(redis, "Session Store", "Redis", "Серверные сессии\nсо сроком действия", $sprite="redis")
-
-ContainerDb(photos, "Blob Storage", "Закрытый каталог / JPEG", "Временные и постоянные\nфотографии", $sprite="folder")
-
-Container(ai, "ImageRecognition Service", "Ollama / Qwen3-VL-2B-Instruct", "Модель на собственном\nоборудовании", $sprite="cogs")
-
 System_Ext(email, "Email Service", "Провайдер отправки писем", $sprite="envelope")
-
+Container(ai, "ImageRecognition Service", "Ollama / Qwen3-VL-2B-Instruct", "Модель на собственном\nоборудовании", $sprite="cogs")
+ContainerDb(photos, "Blob Storage", "Закрытый каталог / JPEG", "Временные и постоянные\nфотографии", $sprite="folder")
+ContainerDb(db, "Database", "PostgreSQL", "Профили, карточки, коллекции;\nответы, метаданные, настройки", $sprite="postgresql")
 System_Ext(push, "Push Service", "Провайдер Android push", $sprite="bell")
 
-
-Rel_D(nginx, api_router, "Проксирует запросы", "HTTP / REST")
-
-Rel_L(api_router, auth_dependency, "Проверяет сессию", "FastAPI Depends")
-Rel_R(api_router, error_handler, "Обрабатывает ошибки", "FastAPI")
-
-Rel_D(api_router, identity, "Вход и профиль", "Python")
-Rel_D(api_router, vocabulary, "Карточки и коллекции", "Python")
-Rel_D(api_router, photo_service, "Загрузка фотографий", "Python")
-Rel_D(api_router, recognition, "Распознавание", "Python")
-Rel_D(api_router, training, "Тренировки", "Python")
-Rel_D(api_router, progress, "Статистика", "Python")
-Rel_D(api_router, notifications, "Уведомления", "Python")
-
-
-Rel_R(identity, identity_domain, "Использует модели и правила", "Python")
-
-Rel_R(vocabulary, vocabulary_domain, "Использует модели карточек", "Python")
-
-Rel_R(photo_service, photo_domain, "Проверяет состояние фото", "Python")
-
-Rel_R(training, learning_domain, "Применяет правила обучения", "Python")
-
-Rel_R(progress, learning_domain, "Рассчитывает достижения", "Python")
-
-Rel_R(notifications, reminder_policy, "Проверяет условия напоминаний", "Python")
-
-
-Rel_D(auth_dependency, session_store, "Проверяет токен", "ISessionStore")
-
-Rel_D(identity, repositories, "Профиль пользователя", "Repository")
-Rel_D(identity, session_store, "Создаёт и отзывает сессии", "ISessionStore")
-Rel_D(identity, email_sender, "Отправляет код входа", "IEmailSender")
-
-Rel_D(vocabulary, repositories, "Сохраняет карточки и коллекции", "Repository")
-Rel_R(vocabulary, photo_service, "Подтверждает фото", "Python")
-
-Rel_D(photo_service, photo_storage, "Сохраняет и удаляет файлы", "IPhotoStorage")
-Rel_D(photo_service, repositories, "Метаданные фотографий", "Repository")
-
-Rel(recognition, photo_service, "Получает фотографию", "Python")
-Rel_D(recognition, ollama_client, "Запрашивает распознавание", "IImageRecognizer")
-
-Rel_D(training, repositories, "Читает карточки и записывает ответы", "Repository")
-Rel_R(training, vocabulary_domain, "Использует WordCard", "Python")
-
-Rel_D(progress, repositories, "Получает историю и агрегаты", "ProgressQueries")
-
-Rel_D(notifications, repositories, "Настройки и токены устройств", "Repository")
-Rel_D(notifications, push_sender, "Отправляет напоминания", "IPushSender")
-
-
-Rel_U(photo_cleanup, photo_service, "Запускает очистку временных фото", "Python")
-
-Rel_U(reminder_job, notifications, "Запускает отправку напоминаний", "Python")
-
-
-Rel_D(repositories, db, "Чтение и запись данных", "SQL / PostgreSQL")
-
-Rel_D(session_store, redis, "Сессии, токены и TTL", "RESP / TCP")
-
-Rel_D(photo_storage, photos, "Чтение, запись и удаление JPEG", "Файловый API")
-
-Rel_D(ollama_client, ai, "Распознавание изображения", "HTTP / JSON + Base64")
-
-Rel_D(email_sender, email, "Отправляет код входа", "SMTP + TLS")
-
-Rel_D(push_sender, push, "Доставляет напоминания", "HTTPS / API")
-
-
+Lay_R(api, jobs)
 Lay_R(auth_dependency, api_router)
 Lay_R(api_router, error_handler)
 
-Lay_D(api_router, vocabulary)
-
-Lay_R(identity, vocabulary)
-Lay_R(vocabulary, photo_service)
-
-Lay_D(identity, recognition)
-Lay_D(vocabulary, training)
-Lay_D(photo_service, progress)
-
-Lay_R(recognition, training)
+Lay_R(identity, recognition)
+Lay_R(recognition, photo_service)
+Lay_R(photo_service, vocabulary)
+Lay_R(vocabulary, training)
 Lay_R(training, progress)
+Lay_R(progress, notifications)
 
-Lay_D(training, notifications)
+Lay_R(identity_domain, photo_domain)
+Lay_R(photo_domain, vocabulary_domain)
+Lay_R(vocabulary_domain, learning_domain)
+Lay_R(learning_domain, reminder_policy)
 
-Lay_R(identity_domain, vocabulary_domain)
-Lay_D(identity_domain, photo_domain)
-Lay_D(vocabulary_domain, learning_domain)
-Lay_R(photo_domain, learning_domain)
-Lay_D(photo_domain, reminder_policy)
+Lay_R(session_store, email_sender)
+Lay_R(email_sender, ollama_client)
+Lay_R(ollama_client, photo_storage)
+Lay_R(photo_storage, repositories)
+Lay_R(repositories, push_sender)
 
-Lay_D(notifications, photo_cleanup)
-Lay_R(photo_cleanup, reminder_job)
+Lay_D(identity_domain, email_sender)
+Lay_D(photo_domain, photo_storage)
+Lay_D(vocabulary_domain, repositories)
+Lay_D(reminder_policy, push_sender)
 
-Lay_R(session_store, repositories)
-Lay_R(repositories, photo_storage)
-Lay_R(photo_storage, ollama_client)
-Lay_R(ollama_client, email_sender)
-Lay_R(email_sender, push_sender)
 
-Lay_D(repositories, db)
-Lay_D(session_store, redis)
-Lay_D(photo_storage, photos)
-Lay_D(ollama_client, ai)
-Lay_D(email_sender, email)
-Lay_D(push_sender, push)
+Rel_D(nginx, api_router, "Запросы", "HTTP / REST", $tags="api")
 
-Lay_R(redis, db)
-Lay_R(db, photos)
-Lay_R(photos, ai)
-Lay_R(ai, email)
-Lay_R(email, push)
+Rel_L(api_router, auth_dependency, "Сессия", "", $tags="api")
+Rel_R(api_router, error_handler, "Ошибки", "", $tags="api")
+
+Rel_D(api_router, identity, "Аккаунт", "", $tags="api")
+Rel_D(api_router, recognition, "Распознавание", "", $tags="api")
+Rel_D(api_router, photo_service, "Фото", "", $tags="api")
+Rel_D(api_router, vocabulary, "Словарь", "", $tags="api")
+Rel_D(api_router, training, "Тренировки", "", $tags="api")
+Rel_D(api_router, progress, "Прогресс", "", $tags="api")
+Rel_D(api_router, notifications, "Напоминания", "", $tags="api")
+
+Rel_D(photo_cleanup, photo_service, "Очистить временные фото", "", $tags="job")
+Rel_D(reminder_job, notifications, "Запустить напоминания", "", $tags="job")
+
+
+Rel_R(recognition, photo_service, "Подготовить фото", "", $tags="module")
+Rel_L(vocabulary, photo_service, "Закрепить фото", "", $tags="module")
+Rel_L(training, vocabulary, "Получить карточки", "", $tags="module")
+
+Rel_D(identity, identity_domain, "Правила аккаунта", "", $tags="domain")
+Rel_D(photo_service, photo_domain, "Состояние фото", "", $tags="domain")
+Rel_D(vocabulary, vocabulary_domain, "Правила карточек", "", $tags="domain")
+Rel_D(training, learning_domain, "ReviewAnswer", "", $tags="domain")
+Rel_D(progress, learning_domain, "Правила прогресса", "", $tags="domain")
+Rel_D(notifications, reminder_policy, "Условия напоминаний", "", $tags="domain")
+
+
+Rel_D(auth_dependency, session_store, "Проверить токен", "", $tags="storage")
+
+Rel_D(identity, session_store, "Создать / отозвать сессию", "", $tags="storage")
+Rel_D(identity, email_sender, "Код входа", "", $tags="storage")
+Rel_D(identity, repositories, "Профиль", "", $tags="storage")
+
+Rel_D(recognition, ollama_client, "Распознать", "", $tags="storage")
+
+Rel_D(photo_service, photo_storage, "Файлы JPEG", "", $tags="storage")
+Rel_D(photo_service, repositories, "Метаданные фото", "", $tags="storage")
+
+Rel_D(vocabulary, repositories, "Чтение / запись карточек", "", $tags="storage")
+Rel_D(training, repositories, "Сохранить ответ", "", $tags="storage")
+Rel_D(progress, repositories, "Агрегаты ответов", "", $tags="storage")
+
+Rel_D(notifications, repositories, "Настройки / устройства", "", $tags="storage")
+Rel_D(notifications, push_sender, "Отправить push", "", $tags="storage")
+
+
+Rel_D(session_store, redis, "Сессии / TTL", "RESP / TCP", $tags="api")
+Rel_D(email_sender, email, "Письмо", "SMTP + TLS", $tags="api")
+Rel_D(ollama_client, ai, "Фото → результат", "HTTP / JSON + Base64", $tags="api")
+Rel_D(photo_storage, photos, "Файлы", "Файловый API", $tags="api")
+Rel_D(repositories, db, "Данные модулей", "SQL / PostgreSQL", $tags="api")
+Rel_D(push_sender, push, "Push", "HTTPS / API", $tags="api")
 
 @enduml
